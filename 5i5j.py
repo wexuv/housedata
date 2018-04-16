@@ -28,17 +28,23 @@ class HouseDB:
         values = self.cursor.fetchall()
         if len(values)<=0:
             self.cursor.execute(HouseDB.createestate)
+            
     def inserthouse(self,id,estateid,total,area):
-        sql='insert into house (id, estateid,total,area) values (%d,%d,%d,%d)'%(id,estateid,total,area)
-        print(sql)
+        sql='insert into house (id, estateid,total,area) values (%d,%d,%f,%f)'%(id,estateid,total,area)
         self.cursor.execute(sql)
         self.conn.commit()
+        
     def insertestate(self,id,name,trafic,avasold,recentsold,recentrent):
-        self.cursor.execute('insert into estate (id, name,trafic,avasold,recentsold,recentrent) values (%d,\'%s\',\'%s\',%d,%d,%d)'%(id,name,trafic,avasold,recentsold,recentrent))
+        print(id,name,trafic,avasold,recentsold,recentrent)
+        sql='insert into estate (id, name,trafic,avasold,recentsold,recentrent) values (%d,\'%s\',\'%s\',%f,%f,%f)'%(id,name,trafic,avasold,recentsold,recentrent)
+        print(sql,1)
+        self.cursor.execute(sql)
         self.conn.commit()
+        
     def close(self):
         self.cursor.close()
         self.conn.close()
+        
     def ishouseexist(self,id):
         sql='select * from house where id=%d'%id
         self.cursor.execute(sql)
@@ -47,6 +53,7 @@ class HouseDB:
             return 0
         else:
             return 1
+        
     def isestateexist(self,id):
         sql='select * from estate where id=%d'%id
         self.cursor.execute(sql)
@@ -148,18 +155,17 @@ def browsehouse( houseid ):
     subway="无"
     if len(subwayinfo) > 0:
         subway = subwayinfo[0]
-
-    print(link)
     
     #保存房源到数据库
-    houseDB.inserthouse(int(houseid),int(estateid),int(jlinfo[0]),int(jlinfo[2]))
-        
+    houseDB.inserthouse(int(houseid),int(estateid[0]),float(jlinfo[0]),float(jlinfo[2]))
+    
     #小区均价，近期二手房成交均价，近期租房成交均价
     estatejj,jqsoldp,jqleasedp
     if int(houseDB.isestateexist(int(estateid[0]))) == 0:
         estatejj,jqsoldp,jqleasedp = browseestate(estateid[0])
         #保存小区数据到数据库
-        houseDB.insertestate(int(estateid),estate,subway,estatejj,jqsoldp,jqleasedp)
+        print(int(estateid),str(estate),str(subway),float(estatejj),float(jqsoldp),float(jqleasedp))
+        houseDB.insertestate(int(estateid),str(estate),str(subway),float(estatejj),float(jqsoldp),float(jqleasedp))
     else:
         estatejj,jqsoldp,jqleasedp = houseDB.getestateinfo(int(estateid[0]))
     
