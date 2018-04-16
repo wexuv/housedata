@@ -8,8 +8,61 @@ import StringIO;
 import gzip
 import time
 import random
+import sqlite3
 
 from bs4 import BeautifulSoup
+
+class HouseDB:
+    createhouse='create table house (id interger primary key, estateid interger,total float,area float)'
+    createestate='create table estate (id interger primary key, name text,trafic text,avasold float,recentsold float,recentrent float)'
+    checkhouse='select *  from sqlite_master where type=\'table\' and name = \'house\''
+    checkestate='select *  from sqlite_master where type=\'table\' and name = \'estate\''
+    def __init__( self, dbname):
+        self.conn = sqlite3.connect(dbname)
+        self.cursor = self.conn.cursor()
+        self.cursor.execute(HouseDB.checkhouse)
+        values = self.cursor.fetchall()
+        if len(values)<=0:
+            self.cursor.execute(HouseDB.createhouse)
+        self.cursor.execute(HouseDB.checkestate)
+        values = self.cursor.fetchall()
+        if len(values)<=0:
+            self.cursor.execute(HouseDB.createestate)
+    def inserthouse(self,id,estateid,total,area):
+        sql='insert into house (id, estateid,total,area) values (%d,%d,%d,%d)'%(id,estateid,total,area)
+        print(sql)
+        self.cursor.execute(sql)
+        self.conn.commit()
+    def insertestate(self,id,name,trafic,avasold,recentsold,recentrent):
+        self.cursor.execute('insert into estate (id, name,trafic,avasold,recentsold,recentrent) values (%d,\'%s\',\'%s\',%d,%d,%d)'%(id,name,trafic,avasold,recentsold,recentrent))
+        self.conn.commit()
+    def close(self):
+        self.cursor.close()
+        self.conn.close()
+    def ishouseexist(self,id):
+        sql='select * from house where id=%d'%id
+        self.cursor.execute(sql)
+        values = self.cursor.fetchall()
+        if len(values)<=0:
+            return 0
+        else:
+            return 1
+    def isestateexist(self,id):
+        sql='select * from estate where id=%d'%id
+        self.cursor.execute(sql)
+        values = self.cursor.fetchall()
+        if len(values)<=0:
+            return 0
+        else:
+            return 1
+    def getestateinfo(self,id):
+        sql='select avasold,recentsold,recentrent from house where id=%d'%id
+        self.cursor.execute(sql)
+        values = self.cursor.fetchall()
+        return values[0],values[1],values[2]
+
+
+houseDB = HouseDB('house.db')
 
 def browseestate(estateid):
     link="https://bj.5i5j.com/xiaoqu/"+str(estateid)+".html"
@@ -69,7 +122,7 @@ def browsehouse( houseid ):
     response = urllib2.urlopen(request)
     html = response.read()
     soup = BeautifulSoup(html)
-        
+
     housesty = soup.find_all("div",class_="housesty")
 
     #总价，单价，面积
@@ -81,7 +134,7 @@ def browsehouse( houseid ):
     href=a.get("href")
     estateid=re.findall(r"\d+",href)
     #小区名称
-    estate=a.text
+    estate=a.text.encode('utf8')
 
     #年代
     yearinfo = re.findall(r"年代：<\/span>(.*)年<\/li>",str(zushous[0]))
@@ -96,8 +149,20 @@ def browsehouse( houseid ):
     if len(subwayinfo) > 0:
         subway = subwayinfo[0]
 
+    print(link)
+    
+    #保存房源到数据库
+    houseDB.inserthouse(int(houseid),int(estateid),int(jlinfo[0]),int(jlinfo[2]))
+        
     #小区均价，近期二手房成交均价，近期租房成交均价
-    estatejj,jqsoldp,jqleasedp = browseestate(estateid[0])
+    estatejj,jqsoldp,jqleasedp
+    if int(houseDB.isestateexist(int(estateid[0]))) == 0:
+        estatejj,jqsoldp,jqleasedp = browseestate(estateid[0])
+        #保存小区数据到数据库
+        houseDB.insertestate(int(estateid),estate,subway,estatejj,jqsoldp,jqleasedp)
+    else:
+        estatejj,jqsoldp,jqleasedp = houseDB.getestateinfo(int(estateid[0]))
+    
     #租售比
     zsper = 0
     if jqsoldp > 0:
@@ -105,7 +170,7 @@ def browsehouse( houseid ):
     
     document = open("soup.txt", "a+");
     
-    document.write(estate.encode('utf8')+",");
+    document.write(estate+",");
     document.write(year+",");
     document.write(str(jlinfo[0])+",");
     document.write(str(jlinfo[2])+",");
@@ -116,8 +181,6 @@ def browsehouse( houseid ):
     document.write(str(jqleasedp)+",");
     document.write(str(zsper)+"\n");
     document.close();
-    
-    return;
 
 url = "https://bj.5i5j.com/ershoufang/o8n%d/"
 headers = {  
@@ -152,21 +215,31 @@ def browsehouselist(page):
             a=divlistImg.find("a");
             href=a.get("href")
             houseid=re.findall(r"\d+",href)
+            result=int(houseDB.ishouseexist(int(houseid[0])))
             print(houseid)
-            browsehouse(houseid[0])
-            time.sleep(random.randint(1,9))
+            if result == 0:
+                print(houseid,result)
+                browsehouse(houseid[0])
+                time.sleep(random.randint(1,9))
+            else:
+                print("err")
     return 1;
 
-document = open("soup.txt", "w+");
-document.write("小区名称,建筑年代,总价,面积,单价,地铁,小区均价,近期二手房均价,近期租房均价,租售比\n");
-document.close();
+def browseall():
+    page_error=[]         
+    for i in range(1,100):
+        try:  
+            re = browsehouselist(i)
+            if re == 0:
+                break;
+        except:  
+            page_error.append(i)
 
-page_error=[]         
-for i in range(1,100):
-    try:  
-        re = browsehouselist(i)
-        if re == 0:
-            break;
-    except:  
-        page_error.append(i)
+def dumpfile():
+    document = open("soup.txt", "w+");
+    document.write("小区名称,建筑年代,总价,面积,单价,地铁,小区均价,近期二手房均价,近期租房均价,租售比\n");
+    document.close();
+    
+browseall()
 
+houseDB.close()
