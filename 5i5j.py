@@ -6,6 +6,8 @@ import urllib2
 import re;
 import StringIO;
 import gzip
+import time
+import random
 
 from bs4 import BeautifulSoup
 
@@ -116,39 +118,54 @@ def browsehouse( houseid ):
     document.close();
     
     return;
-#browsehouse("40038385");
 
-url = "https://bj.5i5j.com/ershoufang/o8/"
+url = "https://bj.5i5j.com/ershoufang/o8n%d/"
 headers = {  
-    'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'  
-} 
-data = None  
-request = urllib2.Request(url,data,headers)
-response = urllib2.urlopen(request)
-html = response.read()
-html = StringIO.StringIO(html)
-gzipper = gzip.GzipFile(fileobj=html)
-html = gzipper.read()
-soup = BeautifulSoup(html, fromEncoding='utf8')
+    'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6',
+    'Host':'bj.5i5j.com',
+    'Referer':'http://bj.5i5j.com/ershoufang',
+    'Upgrade-Insecure-Requests':'1'
+}
 
-plist_all = soup.find_all("ul", class_="pList")
+def browsehouselist(page):
+    print(url%page)
+    request = urllib2.Request(url%page,headers=headers)
+        
+    response = urllib2.urlopen(request)
+    html = response.read()
+    #html = StringIO.StringIO(html)
+    #gzipper = gzip.GzipFile(fileobj=html)
+    #html = gzipper.read()
+    soup = BeautifulSoup(html, fromEncoding='utf8')
 
-document = open("all.txt", "w+");
-document.write(html);
-document.close();
+    plist_all = soup.find_all("ul", class_="pList")
+    if len(plist_all) > 0:
+        return 0;
+    
+    time.sleep(5)
+
+    for plist in plist_all:
+        li_all = plist.findAll("li")
+        for li in li_all:
+            divlistImg=li.find("div",{"class":"listImg"})
+            a=divlistImg.find("a");
+            href=a.get("href")
+            houseid=re.findall(r"\d+",href)
+            print(houseid)
+            browsehouse(houseid[0])
+            time.sleep(random.randint(1,9))
+    return 1;
 
 document = open("soup.txt", "w+");
 document.write("小区名称,建筑年代,总价,面积,单价,地铁,小区均价,近期二手房均价,近期租房均价,租售比\n");
 document.close();
 
-for plist in plist_all:
-    li_all = plist.findAll("li")
-    for li in li_all:
-        divlistImg=li.find("div",{"class":"listImg"})
-        a=divlistImg.find("a");
-        href=a.get("href")
-        houseid=re.findall(r"\d+",href)
-        print(houseid)
-        browsehouse(houseid[0])
-
+page_error=[]         
+for i in range(1,100):
+    try:  
+        re = browsehouselist(i)
+        if re == 0:
+            break;
+    except:  
+        page_error.append(i)
 
