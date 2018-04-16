@@ -139,7 +139,8 @@ def browsehouselist(page):
     soup = BeautifulSoup(html, fromEncoding='utf8')
 
     plist_all = soup.find_all("ul", class_="pList")
-    if len(plist_all) > 0:
+    if len(plist_all) <= 0:
+        print(html)
         return 0;
     
     time.sleep(5)
