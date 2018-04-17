@@ -9,12 +9,13 @@ import gzip
 import time
 import random
 import sqlite3
+import traceback
 
 from bs4 import BeautifulSoup
 
 class HouseDB:
     createhouse='create table house (id interger primary key, estateid interger,total float,area float)'
-    createestate='create table estate (id interger primary key, name text,trafic text,avasold float,recentsold float,recentrent float)'
+    createestate='create table estate (id interger primary key, year interger,name text,trafic text,avasold float,recentsold float,recentrent float)'
     checkhouse='select *  from sqlite_master where type=\'table\' and name = \'house\''
     checkestate='select *  from sqlite_master where type=\'table\' and name = \'estate\''
     def __init__( self, dbname):
@@ -34,10 +35,8 @@ class HouseDB:
         self.cursor.execute(sql)
         self.conn.commit()
         
-    def insertestate(self,id,name,trafic,avasold,recentsold,recentrent):
-        print(id,name,trafic,avasold,recentsold,recentrent)
-        sql='insert into estate (id, name,trafic,avasold,recentsold,recentrent) values (%d,\'%s\',\'%s\',%f,%f,%f)'%(id,name,trafic,avasold,recentsold,recentrent)
-        print(sql,1)
+    def insertestate(self,id,year,name,trafic,avasold,recentsold,recentrent):
+        sql='insert into estate (id,name,year,trafic,avasold,recentsold,recentrent) values (%d,%d,\'%s\',\'%s\',%f,%f,%f)'%(id,year,name,trafic,avasold,recentsold,recentrent)
         self.cursor.execute(sql)
         self.conn.commit()
         
@@ -67,7 +66,11 @@ class HouseDB:
         self.cursor.execute(sql)
         values = self.cursor.fetchall()
         return values[0],values[1],values[2]
-
+    def getallestate(self):
+        sql='select id,name,year,trafic,avasold,recentsold,recentrent from estate'
+        self.cursor.execute(sql)
+        values = self.cursor.fetchall()
+        return values
 
 houseDB = HouseDB('house.db')
 
@@ -81,7 +84,6 @@ def browseestate(estateid):
     xqjpriceinfo = soup.find_all("div",{"class":"xqjprice"})
     #小区均价
     xqjprice = re.findall(r"\d+",str(xqjpriceinfo[0]));
-    
     #二手房成交
     soldp = 0
     soldpcount = 0
@@ -158,15 +160,23 @@ def browsehouse( houseid ):
     
     #保存房源到数据库
     houseDB.inserthouse(int(houseid),int(estateid[0]),float(jlinfo[0]),float(jlinfo[2]))
-    
+
     #小区均价，近期二手房成交均价，近期租房成交均价
-    estatejj,jqsoldp,jqleasedp
+    estatejj=0
+    jqsoldp=0
+    jqleasedp=0
     if int(houseDB.isestateexist(int(estateid[0]))) == 0:
-        estatejj,jqsoldp,jqleasedp = browseestate(estateid[0])
+        print("new estate %s"%estateid[0])
+        try:
+            estatejj,jqsoldp,jqleasedp = browseestate(estateid[0])
+        except Exception as e:
+            print("异常的类型是:%s"%type(e))
+            print("异常对象的内容是:%s"%e)
+            traceback.print_exc()
         #保存小区数据到数据库
-        print(int(estateid),str(estate),str(subway),float(estatejj),float(jqsoldp),float(jqleasedp))
-        houseDB.insertestate(int(estateid),str(estate),str(subway),float(estatejj),float(jqsoldp),float(jqleasedp))
+        houseDB.insertestate(int(estateid[0]),int(year),str(estate),str(subway),float(estatejj),float(jqsoldp),float(jqleasedp))
     else:
+        print("estate %s is exist"%estateid[0])
         estatejj,jqsoldp,jqleasedp = houseDB.getestateinfo(int(estateid[0]))
     
     #租售比
@@ -222,13 +232,12 @@ def browsehouselist(page):
             href=a.get("href")
             houseid=re.findall(r"\d+",href)
             result=int(houseDB.ishouseexist(int(houseid[0])))
-            print(houseid)
             if result == 0:
-                print(houseid,result)
+                print("new house %s"%houseid[0])
                 browsehouse(houseid[0])
                 time.sleep(random.randint(1,9))
             else:
-                print("err")
+                print("houseid %s exist"%houseid[0])
     return 1;
 
 def browseall():
@@ -238,14 +247,27 @@ def browseall():
             re = browsehouselist(i)
             if re == 0:
                 break;
-        except:  
+        except Exception as e:
+            print("异常的类型是:%s"%type(e))
+            print("异常对象的内容是:%s"%e)
+            traceback.print_exc()
             page_error.append(i)
 
 def dumpfile():
+    estateall = houseDB.getallestate();
+    for estate in estateall:
+        divlistImg=li.find("div",{"class":"listImg"})
+        a=divlistImg.find("a");
+        href=a.get("href")
+         houseid=re.findall(r"\d+",href)
+            
+    print(estateall)
     document = open("soup.txt", "w+");
-    document.write("小区名称,建筑年代,总价,面积,单价,地铁,小区均价,近期二手房均价,近期租房均价,租售比\n");
+    document.write("小区编号,小区名称,建筑年代,地铁,小区均价,近期二手房均价,近期租房均价,租售比\n");
+    document.write("%d,%s,%d,%s,%f,%f,%f,%f"%(estate[0],estate[2],estate[1],estate[3],estate[4],estate[5],))
     document.close();
     
-browseall()
+#browseall()
+dumpfile()
 
 houseDB.close()
