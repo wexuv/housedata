@@ -261,7 +261,7 @@ def dumpfile():
         document.write("%d,%s,%d,%s,%f,%f,%f,%f\n"%(estate[0],estate[1].encode('utf8'),int(estate[2]),estate[3].encode('utf8'),estate[4],estate[5],estate[6],zsb))
     document.close();
 
-browseall()
-#dumpfile()
+#browseall()
+dumpfile()
 
 houseDB.close()
